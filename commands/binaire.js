@@ -40,18 +40,9 @@ async function binaire(prompt, customId, link = null) {
 }
 
 module.exports = {
-    config: {
-        name: "binaire",
-        author: "Bruno",
-        version: "1.0.0",
-        countDown: 5,
-        role: 0,
-        category: "ai",
-        shortDescription: {
-            en: "{p}binaire"
-        }
-    },
-
+  name: 'binaire',
+  description: 'Fetch Bac results by candidate number',
+  author: 'Bruno',
     // Fonction principale exécutée lors de l'appel de la commande
     async execute(senderId, args, pageAccessToken, sendMessage, messageReply = null) {
         try {
