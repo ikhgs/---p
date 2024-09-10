@@ -1,24 +1,26 @@
 const { sendMessage } = require('./sendMessage');
 const { callGeminiAPI } = require('../utils/callGeminiAPI');
-const commandHandlers = require('../commands'); // Import all command handlers
+const commandHandlers = require('../commands'); // Chemin corrigé
 
 async function handleMessage(event, pageAccessToken) {
   const senderId = event.sender.id;
-  const messageText = event.message.text.trim(); // Trim leading/trailing whitespace
+  const messageText = event.message.text;
 
   try {
-    // Check if the message is a command or a prompt
+    // Répond directement au texte du message
+    sendMessage(senderId, { text: 'Please wait, I am processing your request...' }, pageAccessToken);
+
+    // Traitement des commandes spécifiques
     const [command, ...args] = messageText.split(' ');
 
+    // Vérifier si la commande existe et l'exécuter
     if (commandHandlers[command]) {
-      // If the command exists, execute the command handler
       await commandHandlers[command].execute(senderId, args, pageAccessToken, sendMessage);
     } else {
-      // Otherwise, treat it as a prompt for Gemini
-      sendMessage(senderId, { text: 'Please wait, I am processing your request...' }, pageAccessToken);
+      // Traitement de Gemini AI si la commande n'existe pas
       const response = await callGeminiAPI(messageText);
 
-      // Split the response into chunks if it exceeds 2000 characters
+      // Diviser la réponse en morceaux si elle dépasse 2000 caractères
       const maxMessageLength = 2000;
       if (response.length > maxMessageLength) {
         const messages = splitMessageIntoChunks(response, maxMessageLength);
