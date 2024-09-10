@@ -5,7 +5,7 @@ module.exports = {
   description: 'Ask a question to the Gemini AI',
   author: 'ChatGPT',
   async execute(senderId, args, pageAccessToken, sendMessage) {
-    const prompt = args.join(' ');
+    const prompt = args.join(' ').trim();
     try {
       sendMessage(senderId, { text: 'Please wait, I am processing your request...' }, pageAccessToken);
       const response = await callGeminiAPI(prompt);
