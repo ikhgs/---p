@@ -2,61 +2,72 @@ const axios = require('axios');
 
 module.exports = {
   name: 'par',
-  description: 'Ask a question to Bruno and handle the conversation',
+  description: 'Fetch a response from Bruno based on a given prompt',
   author: 'cliff',
   
   async execute(senderId, args, pageAccessToken, sendMessage) {
-    const prompt = args.join(' ').trim();
-    if (!prompt) {
-      sendMessage(senderId, { text: 'Please provide a prompt for Bruno.' }, pageAccessToken);
-      return;
-    }
-
     try {
-      sendMessage(senderId, { text: 'Bruno is processing your request. Please wait...' }, pageAccessToken);
-
-      // Call the Par API
-      const response = await callParAPI(prompt);
-
-      // Split the response into chunks if it exceeds 2000 characters
-      const maxMessageLength = 2000;
-      if (response.length > maxMessageLength) {
-        const messages = splitMessageIntoChunks(response, maxMessageLength);
-        const messagePromises = messages.map(message => sendMessage(senderId, { text: message }, pageAccessToken));
-        await Promise.all(messagePromises);
-      } else {
-        sendMessage(senderId, { text: response }, pageAccessToken);
+      if (!args[0]) {
+        return sendMessage(senderId, { text: 'Please provide a prompt for Bruno.' }, pageAccessToken);
       }
 
-      // Save the message ID and context for future replies
-      global.GoatBot.onReply.set(senderId, {
-        commandName: 'par',
-        previousQuestion: prompt, // Keep the previous question for context
-      });
+      const prompt = encodeURIComponent(args.join(" "));
+      const apiUrl = `https://discussion-continue-gem29.vercel.app/api?ask=${prompt}`;
 
+      // Envoyer un message de patience
+      sendMessage(senderId, { text: "Bruno vous répondra dans quelques instants, mais veuillez patienter..." }, pageAccessToken);
+
+      // Faire la requête à l'API
+      const response = await axios.get(apiUrl);
+
+      if (response.data && response.data.response) {
+        // Envoyer la réponse
+        sendMessage(senderId, { text: response.data.response }, pageAccessToken);
+        
+        // Stocker le contexte pour conversation continue
+        global.ConversationContext = global.ConversationContext || {};
+        global.ConversationContext[senderId] = {
+          previousQuestion: args.join(" "),
+          response: response.data.response
+        };
+      } else {
+        sendMessage(senderId, { text: 'Unable to get a response from Bruno.' }, pageAccessToken);
+      }
     } catch (error) {
-      console.error('Error calling Par API:', error.message);
-      sendMessage(senderId, { text: 'Sorry, there was an error processing your request.' }, pageAccessToken);
+      console.error('Error making API request:', error.message, error.response?.data);
+      sendMessage(senderId, { text: 'An error occurred while processing your request.' }, pageAccessToken);
     }
   }
 };
 
-// Function to call the Par API
-async function callParAPI(prompt) {
-  try {
-    const apiUrl = `https://discussion-continue-gem29.vercel.app/api?ask=${encodeURIComponent(prompt)}`;
-    const response = await axios.get(apiUrl);
-    return response.data.response;
-  } catch (error) {
-    throw new Error(`Par API call failed: ${error.message}`);
+// Fonction pour gérer la suite de la conversation
+module.exports.continueConversation = async function(senderId, args, pageAccessToken, sendMessage) {
+  const context = global.ConversationContext && global.ConversationContext[senderId];
+  if (!context) {
+    return sendMessage(senderId, { text: 'There is no active conversation to continue.' }, pageAccessToken);
   }
-}
 
-// Function to split message into chunks
-function splitMessageIntoChunks(message, chunkSize) {
-  const chunks = [];
-  for (let i = 0; i < message.length; i += chunkSize) {
-    chunks.push(message.slice(i, i + chunkSize));
+  let prompt = context.previousQuestion + " " + encodeURIComponent(args.join(" "));
+  const apiUrl = `https://discussion-continue-gem29.vercel.app/api?ask=${prompt}`;
+
+  try {
+    // Faire la requête avec le contexte de la conversation précédente
+    const response = await axios.get(apiUrl);
+
+    if (response.data && response.data.response) {
+      // Envoyer la nouvelle réponse
+      sendMessage(senderId, { text: response.data.response }, pageAccessToken);
+
+      // Mettre à jour le contexte pour la suite de la conversation
+      global.ConversationContext[senderId] = {
+        previousQuestion: prompt,
+        response: response.data.response
+      };
+    } else {
+      sendMessage(senderId, { text: 'Unable to get a response from Bruno.' }, pageAccessToken);
+    }
+  } catch (error) {
+    console.error('Error making API request:', error.message, error.response?.data);
+    sendMessage(senderId, { text: 'An error occurred while processing your request.' }, pageAccessToken);
   }
-  return chunks;
-}
+};
