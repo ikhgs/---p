@@ -3,7 +3,7 @@ const axios = require('axios');
 module.exports = {
   name: 'par',
   description: 'Fetch a response from Bruno based on a given prompt',
-  author: 'cliff',
+  author: 'Bruno',
   
   async execute(senderId, args, pageAccessToken, sendMessage) {
     try {
