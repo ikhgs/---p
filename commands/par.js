@@ -3,7 +3,7 @@ const { callParAPI } = require('../utils/callparAPI');
 module.exports = {
   name: 'par',
   description: 'Ask a question to Bruno and handle the conversation',
-  author: 'cliff',
+  author: 'Bruno',
   async execute(senderId, args, pageAccessToken, sendMessage) {
     const prompt = args.join(' ').trim();
     if (!prompt) {
