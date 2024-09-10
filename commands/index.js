@@ -4,6 +4,7 @@ const gpt4 = require('./gpt4');
 const bacc = require('./bacc');
 const help = require('./help');
 const par = require('./par');
+const binaire = require('./binaire');
 // Ajoutez d'autres commandes ici
 
 module.exports = {
@@ -13,5 +14,6 @@ module.exports = {
   help,
   bacc,
   par,
+  binaire,
   // Exposez d'autres commandes ici
 };
