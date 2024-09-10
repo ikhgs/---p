@@ -10,5 +10,6 @@ module.exports = {
   gemini,
   gpt4,
   help,
+  bacc,
   // Exposez d'autres commandes ici
 };
