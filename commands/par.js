@@ -1,9 +1,10 @@
-const { callParAPI } = require('../utils/callparAPI');
+const axios = require('axios');
 
 module.exports = {
   name: 'par',
   description: 'Ask a question to Bruno and handle the conversation',
-  author: 'Bruno',
+  author: 'cliff',
+  
   async execute(senderId, args, pageAccessToken, sendMessage) {
     const prompt = args.join(' ').trim();
     if (!prompt) {
@@ -40,6 +41,17 @@ module.exports = {
   }
 };
 
+// Function to call the Par API
+async function callParAPI(prompt) {
+  try {
+    const apiUrl = `https://discussion-continue-gem29.vercel.app/api?ask=${encodeURIComponent(prompt)}`;
+    const response = await axios.get(apiUrl);
+    return response.data.response;
+  } catch (error) {
+    throw new Error(`Par API call failed: ${error.message}`);
+  }
+}
+
 // Function to split message into chunks
 function splitMessageIntoChunks(message, chunkSize) {
   const chunks = [];
@@ -47,5 +59,4 @@ function splitMessageIntoChunks(message, chunkSize) {
     chunks.push(message.slice(i, i + chunkSize));
   }
   return chunks;
-  }
-    
+}
