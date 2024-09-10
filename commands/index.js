@@ -6,10 +6,15 @@ const help = require('./help');
 // Ajoutez d'autres commandes ici
 
 module.exports = {
-  spotify,
-  gemini,
-  gpt4,
-  help,
-  bacc,
-  // Exposez d'autres commandes ici
+  name: 'index',
+  description: 'This is the index command that exposes other available commands such as Spotify, Gemini, GPT-4, Bac results, and Help.',
+  credit: 'Bruno',
+  commands: {
+    spotify,
+    gemini,
+    gpt4,
+    help,
+    bacc,
+    // Exposez d'autres commandes ici
+  }
 };
