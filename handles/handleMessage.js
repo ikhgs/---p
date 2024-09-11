@@ -15,28 +15,29 @@ async function handleMessage(event, pageAccessToken) {
   const senderId = event.sender.id;
   const messageText = event.message.text.toLowerCase().trim();
 
-  // Vérifier si le message correspond au modèle de commande pour `par.js`
-  if (commands.has('par') && messageText) {
-    const command = commands.get('par');
-    try {
-      await command.execute(senderId, [messageText], pageAccessToken, sendMessage);
-      return; // Sortir après le traitement de la commande `par`
-    } catch (error) {
-      console.error(`Error executing command 'par':`, error);
-      return; // Sortir après la gestion de l'erreur
-    }
-  }
-
-  // Gérer d'autres commandes (e.g., `help`, `Spotify`)
+  // Diviser le message en parties pour extraire la commande et les arguments
   const args = messageText.split(' ');
   const commandName = args.shift();
 
+  // Vérifier si la commande est reconnue
   if (commands.has(commandName)) {
     const command = commands.get(commandName);
     try {
       await command.execute(senderId, args, pageAccessToken, sendMessage);
     } catch (error) {
       console.error(`Error executing command ${commandName}:`, error);
+      sendMessage(senderId, { text: 'There was an error executing your command.' }, pageAccessToken);
+    }
+  } else {
+    // Si le message ne correspond à aucune commande connue, utiliser 'par' pour répondre automatiquement
+    const defaultCommand = commands.get('par');
+    if (defaultCommand) {
+      try {
+        await defaultCommand.execute(senderId, [messageText], pageAccessToken, sendMessage);
+      } catch (error) {
+        console.error('Error executing default command:', error);
+        sendMessage(senderId, { text: 'There was an error processing your message.' }, pageAccessToken);
+      }
     }
   }
 }
