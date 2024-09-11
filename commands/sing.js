@@ -9,15 +9,37 @@ const baseApiUrl = async () => {
   return base.data.api;
 };
 
+// Fonction pour télécharger un fichier audio
+async function dipto(url, pathName) {
+  try {
+    const response = (await axios.get(url, {
+      responseType: "arraybuffer"
+    })).data;
+
+    fs.writeFileSync(pathName, Buffer.from(response));
+    return fs.createReadStream(pathName);
+  } catch (err) {
+    throw err;
+  }
+}
+
+// Fonction pour télécharger un fichier image
+async function diptoSt(url, pathName) {
+  try {
+    const response = await axios.get(url, {
+      responseType: "stream"
+    });
+    response.data.path = pathName;
+    return response.data;
+  } catch (err) {
+    throw err;
+  }
+}
+
 module.exports = {
-    name: "sing",
-    description: {
-      en: "Download audio from YouTube"
-    },
-    author: "Bruno",
-    guide: {
-      en: "{pn} [<song name>|<song link>]:\nExample:\n{pn} chipi chipi chapa chapa"
-  },
+  name: 'sing',
+  description:'{pn} [<song name>|<song link>]:\nExample:\n{pn} chipi chipi chapa chapa',
+  author: 'Bruno',
   async execute({ api, args, event, commandName, message }) {
     const checkurl = /^(?:https?:\/\/)?(?:m\.|www\.)?(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))((\w|-){11})(?:\S+)?$/;
     let videoID;
@@ -80,30 +102,3 @@ module.exports = {
     }, event.messageID);
   }
 };
-
-// Fonction pour télécharger un fichier audio
-async function dipto(url, pathName) {
-  try {
-    const response = (await axios.get(url, {
-      responseType: "arraybuffer"
-    })).data;
-
-    fs.writeFileSync(pathName, Buffer.from(response));
-    return fs.createReadStream(pathName);
-  } catch (err) {
-    throw err;
-  }
-}
-
-// Fonction pour télécharger un fichier image
-async function diptoSt(url, pathName) {
-  try {
-    const response = await axios.get(url, {
-      responseType: "stream"
-    });
-    response.data.path = pathName;
-    return response.data;
-  } catch (err) {
-    throw err;
-  }
-}
