@@ -7,15 +7,16 @@ module.exports = {
   name: 'quiz',
   description: 'Fetch quiz categories and handle quiz questions',
   author: 'Bruno',
+  
   async execute(senderId, args, pageAccessToken, sendMessage) {
-    try {
-      // Vérifiez si l'utilisateur a déjà sélectionné une catégorie
-      if (userStates[senderId] && userStates[senderId].categoryChosen) {
-        await handleQuizQuestion(senderId, userStates[senderId], args, pageAccessToken, sendMessage);
-        return;
-      }
+    // Vérifier si l'utilisateur est en mode quiz
+    if (userStates[senderId] && userStates[senderId].inQuiz) {
+      await handleQuizQuestion(senderId, args, pageAccessToken, sendMessage);
+      return;
+    }
 
-      // Si l'utilisateur n'a pas encore choisi de catégorie
+    // Si l'utilisateur n'est pas en mode quiz, commencer la sélection de catégorie
+    try {
       const categoriesUrl = 'https://opentdb.com/api_category.php';
       const response = await axios.get(categoriesUrl);
       const categories = response.data.trivia_categories;
@@ -36,7 +37,8 @@ module.exports = {
       // Enregistrer les catégories dans l'état de l'utilisateur
       userStates[senderId] = {
         categories,
-        categoryChosen: false
+        categoryChosen: false,
+        inQuiz: false
       };
     } catch (error) {
       console.error('Error fetching quiz categories:', error.message);
@@ -46,21 +48,36 @@ module.exports = {
 };
 
 // Fonction pour gérer les questions après que l'utilisateur ait sélectionné une catégorie
-async function handleQuizQuestion(senderId, userState, args, pageAccessToken, sendMessage) {
+async function handleQuizQuestion(senderId, args, pageAccessToken, sendMessage) {
   try {
-    // Vérifier si un numéro de catégorie est fourni
-    const categoryIndex = parseInt(args[0]) - 1;
-    if (categoryIndex < 0 || categoryIndex >= userState.categories.length) {
-      return sendMessage(senderId, { text: 'Numéro de catégorie invalide. Veuillez essayer à nouveau.' }, pageAccessToken);
+    const userState = userStates[senderId];
+
+    if (!userState.categoryChosen) {
+      const categoryIndex = parseInt(args[0]) - 1;
+      if (categoryIndex < 0 || categoryIndex >= userState.categories.length) {
+        return sendMessage(senderId, { text: 'Numéro de catégorie invalide. Veuillez essayer à nouveau.' }, pageAccessToken);
+      }
+
+      const chosenCategory = userState.categories[categoryIndex];
+      userState.categoryChosen = true;
+      userState.chosenCategory = chosenCategory;
+      userState.inQuiz = true;
+
+      await sendNextQuizQuestion(senderId, userState, pageAccessToken, sendMessage);
+    } else {
+      // Traiter la réponse de l'utilisateur
+      await processAnswer(senderId, args[0], pageAccessToken, sendMessage);
     }
+  } catch (error) {
+    console.error('Error handling quiz question:', error.message);
+    sendMessage(senderId, { text: 'Une erreur est survenue lors du traitement de la question.' }, pageAccessToken);
+  }
+}
 
-    // Stocker la catégorie choisie
-    const chosenCategory = userState.categories[categoryIndex];
-    userState.categoryChosen = true;
-    userState.chosenCategory = chosenCategory;
-
-    // Appeler l'API pour obtenir une question de quiz dans la catégorie sélectionnée
-    const quizUrl = `https://opentdb.com/api.php?amount=1&category=${chosenCategory.id}&type=multiple`;
+// Fonction pour envoyer la prochaine question de quiz
+async function sendNextQuizQuestion(senderId, userState, pageAccessToken, sendMessage) {
+  try {
+    const quizUrl = `https://opentdb.com/api.php?amount=1&category=${userState.chosenCategory.id}&type=multiple`;
     const quizResponse = await axios.get(quizUrl);
     const questionData = quizResponse.data.results[0];
 
@@ -71,27 +88,25 @@ async function handleQuizQuestion(senderId, userState, args, pageAccessToken, se
     const quizAnswers = [...questionData.incorrect_answers, questionData.correct_answer];
     quizAnswers.sort(() => Math.random() - 0.5); // Mélanger les réponses
 
-    let questionMessage = `Voici une question dans la catégorie: ${chosenCategory.name}\n${questionData.question}\n\n`;
+    let questionMessage = `Voici une question dans la catégorie: ${userState.chosenCategory.name}\n${questionData.question}\n\n`;
     quizAnswers.forEach((answer, index) => {
       questionMessage += `${index + 1}- ${answer}\n`;
     });
 
-    // Envoyer la question et attendre la réponse de l'utilisateur
     sendMessage(senderId, { text: questionMessage }, pageAccessToken);
 
-    // Stocker les informations de la question pour traiter la réponse de l'utilisateur
     userState.correctAnswer = questionData.correct_answer;
     userState.answers = quizAnswers;
     userState.questionAsked = true;
 
   } catch (error) {
-    console.error('Error fetching quiz question:', error.message);
-    sendMessage(senderId, { text: 'Une erreur est survenue lors de la récupération de la question de quiz.' }, pageAccessToken);
+    console.error('Error sending quiz question:', error.message);
+    sendMessage(senderId, { text: 'Une erreur est survenue lors de l\'envoi de la question de quiz.' }, pageAccessToken);
   }
 }
 
 // Fonction pour traiter la réponse à la question
-module.exports.processAnswer = async function(senderId, answer, pageAccessToken, sendMessage) {
+async function processAnswer(senderId, answer, pageAccessToken, sendMessage) {
   try {
     const userState = userStates[senderId];
 
@@ -108,10 +123,18 @@ module.exports.processAnswer = async function(senderId, answer, pageAccessToken,
       sendMessage(senderId, { text: `Mauvaise réponse. La bonne réponse était: ${userState.correctAnswer}.` }, pageAccessToken);
     }
 
-    // Réinitialiser l'état de l'utilisateur après la réponse
-    userStates[senderId] = { categories: userState.categories };
+    // Envoyer la prochaine question automatiquement
+    await sendNextQuizQuestion(senderId, userState, pageAccessToken, sendMessage);
+
   } catch (error) {
     console.error('Error processing answer:', error.message);
     sendMessage(senderId, { text: 'Une erreur est survenue lors du traitement de la réponse.' }, pageAccessToken);
+  }
+}
+
+// Fonction pour arrêter le quiz
+module.exports.stopQuiz = function(senderId) {
+  if (userStates[senderId]) {
+    userStates[senderId] = { categories: userStates[senderId].categories };
   }
 };
