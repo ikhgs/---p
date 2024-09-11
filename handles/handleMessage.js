@@ -23,7 +23,7 @@ async function handleMessage(event, pageAccessToken) {
       return; // Exit after handling the `par` command to avoid further processing
     } catch (error) {
       console.error(`Error executing command 'par':`, error);
-      sendMessage(senderId, { text: 'There was an error processing your request.' }, pageAccessToken);
+      // Ne pas envoyer de message d'erreur générique ici
       return; // Exit after handling the error
     }
   }
@@ -38,7 +38,7 @@ async function handleMessage(event, pageAccessToken) {
       await command.execute(senderId, args, pageAccessToken, sendMessage);
     } catch (error) {
       console.error(`Error executing command ${commandName}:`, error);
-      sendMessage(senderId, { text: 'There was an error executing that command.' }, pageAccessToken);
+      // Ne pas envoyer de message d'erreur générique ici
     }
   }
 }
