@@ -35,8 +35,7 @@ module.exports = {
       }
     } catch (error) {
       console.error('Error making API request:', error.message, error.response?.data);
-      // Suppression du message d'erreur générique
-      // Vous pouvez aussi choisir d'envoyer un message différent ici si nécessaire
+      // Ne pas envoyer de message d'erreur générique ici
     }
   }
 };
