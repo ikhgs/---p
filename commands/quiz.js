@@ -9,14 +9,14 @@ module.exports = {
   author: 'Bruno',
   
   async execute(senderId, args, pageAccessToken, sendMessage) {
-    // Vérifier si l'utilisateur est en mode quiz
-    if (userStates[senderId] && userStates[senderId].inQuiz) {
-      await handleQuizQuestion(senderId, args, pageAccessToken, sendMessage);
-      return;
-    }
-
-    // Si l'utilisateur n'est pas en mode quiz, commencer la sélection de catégorie
     try {
+      // Vérifiez si l'utilisateur est en mode quiz
+      if (userStates[senderId] && userStates[senderId].inQuiz) {
+        await handleQuizQuestion(senderId, args, pageAccessToken, sendMessage);
+        return;
+      }
+
+      // Si l'utilisateur n'est pas en mode quiz, commencer la sélection de catégorie
       const categoriesUrl = 'https://opentdb.com/api_category.php';
       const response = await axios.get(categoriesUrl);
       const categories = response.data.trivia_categories;
@@ -31,7 +31,6 @@ module.exports = {
         message += `${index + 1}. ${category.name}\n`;
       });
 
-      // Envoyer les catégories et stocker l'état de l'utilisateur
       sendMessage(senderId, { text: message }, pageAccessToken);
 
       // Enregistrer les catégories dans l'état de l'utilisateur
@@ -53,16 +52,19 @@ async function handleQuizQuestion(senderId, args, pageAccessToken, sendMessage) 
     const userState = userStates[senderId];
 
     if (!userState.categoryChosen) {
+      // Vérifier si un numéro de catégorie est fourni
       const categoryIndex = parseInt(args[0]) - 1;
       if (categoryIndex < 0 || categoryIndex >= userState.categories.length) {
         return sendMessage(senderId, { text: 'Numéro de catégorie invalide. Veuillez essayer à nouveau.' }, pageAccessToken);
       }
 
+      // Stocker la catégorie choisie
       const chosenCategory = userState.categories[categoryIndex];
       userState.categoryChosen = true;
       userState.chosenCategory = chosenCategory;
       userState.inQuiz = true;
 
+      // Envoyer la première question de quiz
       await sendNextQuizQuestion(senderId, userState, pageAccessToken, sendMessage);
     } else {
       // Traiter la réponse de l'utilisateur
