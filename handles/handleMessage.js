@@ -1,35 +1,40 @@
 const { sendMessage } = require('./sendMessage');
-const commandHandlers = require('../commands'); // Assure-toi que ce chemin est correct
+const fs = require('fs');
+const path = require('path');
+
+// Charger dynamiquement toutes les commandes
+const commandDirectory = path.join(__dirname, '../commands');
+const commandFiles = fs.readdirSync(commandDirectory).filter(file => file.endsWith('.js'));
+
+const commandHandlers = {};
+
+for (const file of commandFiles) {
+  const command = require(path.join(commandDirectory, file));
+  commandHandlers[command.name] = command;
+}
 
 async function handleMessage(event, pageAccessToken) {
   const senderId = event.sender.id;
   const messageText = event.message.text;
 
   try {
-    console.log(`Received message: ${messageText}`);
-    sendMessage(senderId, { text: 'Please wait, I am processing your request...' }, pageAccessToken);
+    // Déterminer si le message est une commande
+    const [commandName, ...args] = messageText.split(' ');
 
-    const [command, ...args] = messageText.split(' ');
-
-    if (commandHandlers[command]) {
-      console.log(`Executing command: ${command}`);
-      await commandHandlers[command].execute(senderId, args, pageAccessToken, sendMessage);
+    // Si une commande est spécifiée, traiter cette commande
+    if (commandHandlers[commandName]) {
+      await commandHandlers[commandName].execute(senderId, args, pageAccessToken, sendMessage);
     } else {
-      console.log(`Command not found, using Gemini AI for: ${messageText}`);
-      const response = await callGeminiAPI(messageText);
-
-      if (response.length > 2000) {
-        const messages = splitMessageIntoChunks(response, 2000);
-        for (const message of messages) {
-          sendMessage(senderId, { text: message }, pageAccessToken);
-        }
+      // Sinon, traiter automatiquement la commande 'par'
+      if (commandHandlers['par']) {
+        await commandHandlers['par'].execute(senderId, [messageText], pageAccessToken, sendMessage);
       } else {
-        sendMessage(senderId, { text: response }, pageAccessToken);
+        sendMessage(senderId, { text: 'Sorry, I don\'t understand that command.' }, pageAccessToken);
       }
     }
   } catch (error) {
-    console.error('Error handling message:', error.message);
-    sendMessage(senderId, { text: 'An unexpected error occurred while processing your request.' }, pageAccessToken);
+    console.error('Error handling message:', error);
+    sendMessage(senderId, { text: 'Sorry, there was an error processing your request.' }, pageAccessToken);
   }
 }
 
