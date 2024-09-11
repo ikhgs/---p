@@ -8,8 +8,6 @@ const app = express();
 app.use(bodyParser.json());
 
 const VERIFY_TOKEN = 'pagebot';
-
-// Utilisation de la variable d'environnement ou du fichier token.txt
 const PAGE_ACCESS_TOKEN = process.env.PAGE_ACCESS_TOKEN || fs.readFileSync('token.txt', 'utf8').trim();
 
 app.get('/webhook', (req, res) => {
