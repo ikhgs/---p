@@ -1,24 +1,32 @@
 const { sendMessage } = require('./sendMessage');
-const { callGeminiAPI } = require('../utils/callGeminiAPI');
-const commandHandlers = require('../commands'); // Chemin corrigé
+const commandHandlers = require('../commands'); // Charge toutes les commandes dans le répertoire commands
 
 async function handleMessage(event, pageAccessToken) {
   const senderId = event.sender.id;
   const messageText = event.message.text;
 
   try {
-    // Répond directement au texte du message
-    sendMessage(senderId, { text: 'Please wait, I am processing your request...' }, pageAccessToken);
-
-    // Traitement des commandes spécifiques
+    // Extraire la commande et les arguments
     const [command, ...args] = messageText.split(' ');
 
-    // Vérifier si la commande existe et l'exécuter
-    if (commandHandlers[command]) {
-      await commandHandlers[command].execute(senderId, args, pageAccessToken, sendMessage);
+    // Vérifier si une commande correspond au texte de l'utilisateur
+    if (commandHandlers[command.toLowerCase()]) {
+      // Exécuter la commande spécifiée
+      const response = await commandHandlers[command.toLowerCase()].execute(senderId, args, pageAccessToken, sendMessage);
+      
+      // Diviser la réponse en morceaux si elle dépasse 2000 caractères
+      const maxMessageLength = 2000;
+      if (response.length > maxMessageLength) {
+        const messages = splitMessageIntoChunks(response, maxMessageLength);
+        for (const message of messages) {
+          sendMessage(senderId, { text: message }, pageAccessToken);
+        }
+      } else {
+        sendMessage(senderId, { text: response }, pageAccessToken);
+      }
     } else {
-      // Traitement de Gemini AI si la commande n'existe pas
-      const response = await callGeminiAPI(messageText);
+      // Si aucune commande spécifique n'est trouvée, exécuter par défaut la commande 'par.js'
+      const response = await commandHandlers['par'].execute(senderId, [messageText], pageAccessToken, sendMessage);
 
       // Diviser la réponse en morceaux si elle dépasse 2000 caractères
       const maxMessageLength = 2000;
@@ -37,6 +45,7 @@ async function handleMessage(event, pageAccessToken) {
   }
 }
 
+// Fonction pour diviser un message en morceaux
 function splitMessageIntoChunks(message, chunkSize) {
   const chunks = [];
   for (let i = 0; i < message.length; i += chunkSize) {
