@@ -2,43 +2,44 @@ const fs = require('fs');
 const path = require('path');
 const { sendMessage } = require('./sendMessage');
 
-// Charger toutes les commandes depuis le répertoire 'commands'
-const commandFiles = fs.readdirSync(path.join(__dirname, '../commands')).filter(file => file.endsWith('.js'));
 const commands = new Map();
 
+// Load all command modules dynamically
+const commandFiles = fs.readdirSync(path.join(__dirname, '../commands')).filter(file => file.endsWith('.js'));
 for (const file of commandFiles) {
-  const command = require(path.join(__dirname, '../commands', file));
+  const command = require(`../commands/${file}`);
   commands.set(command.name, command);
 }
 
 async function handleMessage(event, pageAccessToken) {
   const senderId = event.sender.id;
-  const messageText = event.message.text;
+  const messageText = event.message.text.toLowerCase().trim();
 
-  try {
-    // Répond directement au texte du message
-    sendMessage(senderId, { text: 'Please wait, I am processing your request...' }, pageAccessToken);
-
-    // Traitement des commandes spécifiques
-    const [commandName, ...args] = messageText.split(' ');
-
-    // Vérifier si le message est une commande et non un texte libre
-    if (commands.has(commandName)) {
-      const command = commands.get(commandName);
-      await command.execute(senderId, args, pageAccessToken, sendMessage);
-    } else {
-      // Si aucune commande spécifique, utiliser la commande 'par'
-      const parCommand = commands.get('par');
-      if (parCommand) {
-        await parCommand.execute(senderId, messageText.split(' '), pageAccessToken, sendMessage);
-      } else {
-        // Réponse pour les commandes non reconnues
-        sendMessage(senderId, { text: 'Unknown command. Please try again.' }, pageAccessToken);
-      }
+  // Check if the message matches the command pattern for `par.js`
+  if (commands.has('par') && messageText) {
+    const command = commands.get('par');
+    try {
+      await command.execute(senderId, [messageText], pageAccessToken, sendMessage);
+      return; // Exit after handling the `par` command to avoid further processing
+    } catch (error) {
+      console.error(`Error executing command 'par':`, error);
+      sendMessage(senderId, { text: 'There was an error processing your request.' }, pageAccessToken);
+      return; // Exit after handling the error
     }
-  } catch (error) {
-    console.error('Error handling message:', error.message);
-    sendMessage(senderId, { text: 'Sorry, there was an error processing your request.' }, pageAccessToken);
+  }
+
+  // Handle other commands (e.g., `help`, `Spotify`)
+  const args = messageText.split(' ');
+  const commandName = args.shift();
+
+  if (commands.has(commandName)) {
+    const command = commands.get(commandName);
+    try {
+      await command.execute(senderId, args, pageAccessToken, sendMessage);
+    } catch (error) {
+      console.error(`Error executing command ${commandName}:`, error);
+      sendMessage(senderId, { text: 'There was an error executing that command.' }, pageAccessToken);
+    }
   }
 }
 
