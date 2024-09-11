@@ -4,7 +4,7 @@ const { sendMessage } = require('./sendMessage');
 
 const commands = new Map();
 
-// Load all command modules dynamically
+// Charger tous les modules de commande dynamiquement
 const commandFiles = fs.readdirSync(path.join(__dirname, '../commands')).filter(file => file.endsWith('.js'));
 for (const file of commandFiles) {
   const command = require(`../commands/${file}`);
@@ -15,20 +15,19 @@ async function handleMessage(event, pageAccessToken) {
   const senderId = event.sender.id;
   const messageText = event.message.text.toLowerCase().trim();
 
-  // Check if the message matches the command pattern for `par.js`
+  // Vérifier si le message correspond au modèle de commande pour `par.js`
   if (commands.has('par') && messageText) {
     const command = commands.get('par');
     try {
       await command.execute(senderId, [messageText], pageAccessToken, sendMessage);
-      return; // Exit after handling the `par` command to avoid further processing
+      return; // Sortir après le traitement de la commande `par`
     } catch (error) {
       console.error(`Error executing command 'par':`, error);
-      // Ne pas envoyer de message d'erreur générique ici
-      return; // Exit after handling the error
+      return; // Sortir après la gestion de l'erreur
     }
   }
 
-  // Handle other commands (e.g., `help`, `Spotify`)
+  // Gérer d'autres commandes (e.g., `help`, `Spotify`)
   const args = messageText.split(' ');
   const commandName = args.shift();
 
@@ -38,7 +37,6 @@ async function handleMessage(event, pageAccessToken) {
       await command.execute(senderId, args, pageAccessToken, sendMessage);
     } catch (error) {
       console.error(`Error executing command ${commandName}:`, error);
-      // Ne pas envoyer de message d'erreur générique ici
     }
   }
 }
