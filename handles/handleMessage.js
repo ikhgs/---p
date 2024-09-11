@@ -1,37 +1,25 @@
 const { sendMessage } = require('./sendMessage');
-const commandHandlers = require('../commands'); // Charge toutes les commandes dans le répertoire commands
+const commandHandlers = require('../commands'); // Assure-toi que ce chemin est correct
 
 async function handleMessage(event, pageAccessToken) {
   const senderId = event.sender.id;
   const messageText = event.message.text;
 
   try {
-    // Extraire la commande et les arguments
+    console.log(`Received message: ${messageText}`);
+    sendMessage(senderId, { text: 'Please wait, I am processing your request...' }, pageAccessToken);
+
     const [command, ...args] = messageText.split(' ');
 
-    // Vérifier si une commande correspond au texte de l'utilisateur
-    if (commandHandlers[command.toLowerCase()]) {
-      // Exécuter la commande spécifiée
-      const response = await commandHandlers[command.toLowerCase()].execute(senderId, args, pageAccessToken, sendMessage);
-
-      // Diviser la réponse en morceaux si elle dépasse 2000 caractères
-      const maxMessageLength = 2000;
-      if (response.length > maxMessageLength) {
-        const messages = splitMessageIntoChunks(response, maxMessageLength);
-        for (const message of messages) {
-          sendMessage(senderId, { text: message }, pageAccessToken);
-        }
-      } else {
-        sendMessage(senderId, { text: response }, pageAccessToken);
-      }
+    if (commandHandlers[command]) {
+      console.log(`Executing command: ${command}`);
+      await commandHandlers[command].execute(senderId, args, pageAccessToken, sendMessage);
     } else {
-      // Si aucune commande spécifique n'est trouvée, exécuter par défaut la commande 'par.js'
-      const response = await commandHandlers['par'].execute(senderId, [messageText], pageAccessToken, sendMessage);
+      console.log(`Command not found, using Gemini AI for: ${messageText}`);
+      const response = await callGeminiAPI(messageText);
 
-      // Diviser la réponse en morceaux si elle dépasse 2000 caractères
-      const maxMessageLength = 2000;
-      if (response.length > maxMessageLength) {
-        const messages = splitMessageIntoChunks(response, maxMessageLength);
+      if (response.length > 2000) {
+        const messages = splitMessageIntoChunks(response, 2000);
         for (const message of messages) {
           sendMessage(senderId, { text: message }, pageAccessToken);
         }
@@ -40,13 +28,11 @@ async function handleMessage(event, pageAccessToken) {
       }
     }
   } catch (error) {
-    console.error('Error handling message:', error);
-    // Envoyer un message d'erreur uniquement en cas d'exception
-    sendMessage(senderId, { text: 'Sorry, there was an error processing your request.' }, pageAccessToken);
+    console.error('Error handling message:', error.message);
+    sendMessage(senderId, { text: 'An unexpected error occurred while processing your request.' }, pageAccessToken);
   }
 }
 
-// Fonction pour diviser un message en morceaux
 function splitMessageIntoChunks(message, chunkSize) {
   const chunks = [];
   for (let i = 0; i < message.length; i += chunkSize) {
