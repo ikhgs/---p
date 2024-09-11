@@ -14,7 +14,7 @@ module.exports = {
     const apiUrl = `https://discussion-continue-gem29.vercel.app/api?ask=${prompt}`;
 
     // Envoyer un message de patience
-    await sendMessage(senderId, { text: "Bruno vous répondra dans quelques instants, mais veuillez patienter..." }, pageAccessToken);
+    sendMessage(senderId, { text: "Bruno vous répondra dans quelques instants, mais veuillez patienter..." }, pageAccessToken);
 
     try {
       // Faire la requête à l'API
@@ -22,7 +22,7 @@ module.exports = {
 
       if (response.data && response.data.response) {
         // Envoyer la réponse
-        await sendMessage(senderId, { text: response.data.response }, pageAccessToken);
+        sendMessage(senderId, { text: response.data.response }, pageAccessToken);
         
         // Stocker le contexte pour conversation continue
         global.ConversationContext = global.ConversationContext || {};
@@ -31,11 +31,11 @@ module.exports = {
           response: response.data.response
         };
       } else {
-        await sendMessage(senderId, { text: 'Unable to get a response from Bruno.' }, pageAccessToken);
+        sendMessage(senderId, { text: 'Unable to get a response from Bruno.' }, pageAccessToken);
       }
     } catch (error) {
       console.error('Error making API request:', error.message, error.response?.data);
-      // Ne pas envoyer de message d'erreur générique ici
+      // Supprimer ce message si vous ne souhaitez pas qu'il s'affiche
     }
   }
 };
