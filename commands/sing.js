@@ -10,20 +10,13 @@ const baseApiUrl = async () => {
 };
 
 module.exports = {
-  config: {
     name: "sing",
-    version: "1.1.5",
-    aliases: ["music", "play"],
-    author: "dipto",
-    countDown: 5,
-    role: 0,
     description: {
       en: "Download audio from YouTube"
     },
-    category: "media",
+    author: "Bruno",
     guide: {
       en: "{pn} [<song name>|<song link>]:\nExample:\n{pn} chipi chipi chapa chapa"
-    }
   },
   async execute({ api, args, event, commandName, message }) {
     const checkurl = /^(?:https?:\/\/)?(?:m\.|www\.)?(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))((\w|-){11})(?:\S+)?$/;
