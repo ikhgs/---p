@@ -12,68 +12,71 @@ module.exports = {
     try {
       // Vérifiez si l'utilisateur est en mode quiz
       if (userStates[senderId] && userStates[senderId].inQuiz) {
-        await handleQuizQuestion(senderId, args, pageAccessToken, sendMessage);
+        await handleUserAnswer(senderId, args, pageAccessToken, sendMessage);
         return;
       }
 
       // Si l'utilisateur n'est pas en mode quiz, commencer la sélection de catégorie
-      const categoriesUrl = 'https://opentdb.com/api_category.php';
-      const response = await axios.get(categoriesUrl);
-      const categories = response.data.trivia_categories;
-
-      if (!categories || categories.length === 0) {
-        return sendMessage(senderId, { text: 'Aucune catégorie de quiz trouvée.' }, pageAccessToken);
+      if (args.length === 0) {
+        await sendCategories(senderId, pageAccessToken, sendMessage);
+      } else {
+        await handleCategorySelection(senderId, args, pageAccessToken, sendMessage);
       }
-
-      // Envoyer la liste des catégories à l'utilisateur
-      let message = 'Veuillez choisir une catégorie de quiz en répondant avec un numéro:\n';
-      categories.forEach((category, index) => {
-        message += `${index + 1}. ${category.name}\n`;
-      });
-
-      sendMessage(senderId, { text: message }, pageAccessToken);
-
-      // Enregistrer les catégories dans l'état de l'utilisateur
-      userStates[senderId] = {
-        categories,
-        categoryChosen: false,
-        inQuiz: false
-      };
     } catch (error) {
-      console.error('Error fetching quiz categories:', error.message);
-      sendMessage(senderId, { text: 'Une erreur est survenue lors de la récupération des catégories de quiz.' }, pageAccessToken);
+      console.error('Error handling quiz command:', error.message);
+      sendMessage(senderId, { text: 'Une erreur est survenue lors du traitement de la commande.' }, pageAccessToken);
     }
   }
 };
 
-// Fonction pour gérer les questions après que l'utilisateur ait sélectionné une catégorie
-async function handleQuizQuestion(senderId, args, pageAccessToken, sendMessage) {
+// Fonction pour envoyer la liste des catégories
+async function sendCategories(senderId, pageAccessToken, sendMessage) {
   try {
-    const userState = userStates[senderId];
+    const categoriesUrl = 'https://opentdb.com/api_category.php';
+    const response = await axios.get(categoriesUrl);
+    const categories = response.data.trivia_categories;
 
-    if (!userState.categoryChosen) {
-      // Vérifier si un numéro de catégorie est fourni
-      const categoryIndex = parseInt(args[0]) - 1;
-      if (categoryIndex < 0 || categoryIndex >= userState.categories.length) {
-        return sendMessage(senderId, { text: 'Numéro de catégorie invalide. Veuillez essayer à nouveau.' }, pageAccessToken);
-      }
-
-      // Stocker la catégorie choisie
-      const chosenCategory = userState.categories[categoryIndex];
-      userState.categoryChosen = true;
-      userState.chosenCategory = chosenCategory;
-      userState.inQuiz = true;
-
-      // Envoyer la première question de quiz
-      await sendNextQuizQuestion(senderId, userState, pageAccessToken, sendMessage);
-    } else {
-      // Traiter la réponse de l'utilisateur
-      await processAnswer(senderId, args[0], pageAccessToken, sendMessage);
+    if (!categories || categories.length === 0) {
+      return sendMessage(senderId, { text: 'Aucune catégorie de quiz trouvée.' }, pageAccessToken);
     }
+
+    let message = 'Veuillez choisir une catégorie de quiz en répondant avec un numéro:\n';
+    categories.forEach((category, index) => {
+      message += `${index + 1}. ${category.name}\n`;
+    });
+
+    sendMessage(senderId, { text: message }, pageAccessToken);
+
+    userStates[senderId] = {
+      categories,
+      categoryChosen: false,
+      inQuiz: false
+    };
   } catch (error) {
-    console.error('Error handling quiz question:', error.message);
-    sendMessage(senderId, { text: 'Une erreur est survenue lors du traitement de la question.' }, pageAccessToken);
+    console.error('Error fetching quiz categories:', error.message);
+    sendMessage(senderId, { text: 'Une erreur est survenue lors de la récupération des catégories de quiz.' }, pageAccessToken);
   }
+}
+
+// Fonction pour gérer la sélection de catégorie
+async function handleCategorySelection(senderId, args, pageAccessToken, sendMessage) {
+  const userState = userStates[senderId];
+
+  if (!userState || userState.categoryChosen) {
+    return sendMessage(senderId, { text: 'Vous devez d\'abord sélectionner une catégorie.' }, pageAccessToken);
+  }
+
+  const categoryIndex = parseInt(args[0]) - 1;
+  if (categoryIndex < 0 || categoryIndex >= userState.categories.length) {
+    return sendMessage(senderId, { text: 'Numéro de catégorie invalide. Veuillez essayer à nouveau.' }, pageAccessToken);
+  }
+
+  const chosenCategory = userState.categories[categoryIndex];
+  userState.categoryChosen = true;
+  userState.chosenCategory = chosenCategory;
+  userState.inQuiz = true;
+
+  await sendNextQuizQuestion(senderId, userState, pageAccessToken, sendMessage);
 }
 
 // Fonction pour envoyer la prochaine question de quiz
@@ -107,8 +110,8 @@ async function sendNextQuizQuestion(senderId, userState, pageAccessToken, sendMe
   }
 }
 
-// Fonction pour traiter la réponse à la question
-async function processAnswer(senderId, answer, pageAccessToken, sendMessage) {
+// Fonction pour gérer la réponse de l'utilisateur
+async function handleUserAnswer(senderId, args, pageAccessToken, sendMessage) {
   try {
     const userState = userStates[senderId];
 
@@ -116,7 +119,7 @@ async function processAnswer(senderId, answer, pageAccessToken, sendMessage) {
       return sendMessage(senderId, { text: 'Veuillez d\'abord poser une question de quiz.' }, pageAccessToken);
     }
 
-    const userAnswerIndex = parseInt(answer) - 1;
+    const userAnswerIndex = parseInt(args[0]) - 1;
     const userAnswer = userState.answers[userAnswerIndex];
 
     if (userAnswer === userState.correctAnswer) {
