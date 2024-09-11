@@ -13,7 +13,7 @@ async function handleMessage(event, pageAccessToken) {
     if (commandHandlers[command.toLowerCase()]) {
       // Exécuter la commande spécifiée
       const response = await commandHandlers[command.toLowerCase()].execute(senderId, args, pageAccessToken, sendMessage);
-      
+
       // Diviser la réponse en morceaux si elle dépasse 2000 caractères
       const maxMessageLength = 2000;
       if (response.length > maxMessageLength) {
@@ -41,6 +41,7 @@ async function handleMessage(event, pageAccessToken) {
     }
   } catch (error) {
     console.error('Error handling message:', error);
+    // Envoyer un message d'erreur uniquement en cas d'exception
     sendMessage(senderId, { text: 'Sorry, there was an error processing your request.' }, pageAccessToken);
   }
 }
