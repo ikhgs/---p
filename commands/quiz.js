@@ -67,8 +67,10 @@ module.exports = {
       return;
     }
 
+    // Comparer l'index de la réponse utilisateur avec l'index de la réponse correcte
     const correctAnswer = quizContext.correctAnswer;
-    const isCorrect = quizContext.allAnswers[userAnswer - 1] === correctAnswer;
+    const selectedAnswer = quizContext.allAnswers[userAnswer - 1];
+    const isCorrect = selectedAnswer === correctAnswer;
 
     if (isCorrect) {
       sendMessage(senderId, { text: '✅ Réponse correcte !' }, pageAccessToken);
