@@ -6,21 +6,31 @@ module.exports = {
   author: '🏖️ Quiz IA 🏝️',
 
   async execute(senderId, args, pageAccessToken, sendMessage) {
-    // Vérifier si l'utilisateur a déjà une question en cours
-    if (global.QuizContext && global.QuizContext[senderId] && global.QuizContext[senderId].correctAnswer) {
-      // Si une réponse est attendue, on vérifie si l'utilisateur a répondu
-      const userAnswer = parseInt(args[0], 10); // Convertir la réponse de l'utilisateur en nombre
+    // Si l'utilisateur a déjà une question en cours, vérifier la réponse
+    if (global.QuizContext && global.QuizContext[senderId] && global.QuizContext[senderId].waitingForAnswer) {
+      const userAnswer = parseInt(args[0], 10); // La réponse de l'utilisateur
+      const correctAnswer = global.QuizContext[senderId].correctAnswer;
+      const correctIndex = global.QuizContext[senderId].correctIndex; // Index de la bonne réponse (1-4)
 
-      if (!isNaN(userAnswer) && userAnswer >= 1 && userAnswer <= 4) {
-        // Vérifier la réponse
-        return this.checkAnswer(senderId, userAnswer, pageAccessToken, sendMessage);
-      } else {
-        sendMessage(senderId, { text: 'Veuillez répondre avec un numéro entre 1 et 4 pour sélectionner une option.' }, pageAccessToken);
-        return;
+      // Vérifier si la réponse est valide (entre 1 et 4)
+      if (isNaN(userAnswer) || userAnswer < 1 || userAnswer > 4) {
+        return sendMessage(senderId, { text: 'Veuillez répondre avec un numéro entre 1 et 4 pour sélectionner une option.' }, pageAccessToken);
       }
+
+      // Vérifier si la réponse est correcte
+      if (userAnswer === correctIndex) {
+        sendMessage(senderId, { text: 'Bonne réponse ! 🎉' }, pageAccessToken);
+      } else {
+        sendMessage(senderId, { text: `Mauvaise réponse. La bonne réponse était : ${correctAnswer}.` }, pageAccessToken);
+      }
+
+      // Réinitialiser l'état du quiz après la réponse
+      global.QuizContext[senderId] = null;
+      sendMessage(senderId, { text: "Envoyez 'quiz' pour une nouvelle question ou toute autre commande pour interagir." }, pageAccessToken);
+      return;
     }
 
-    // Envoyer un message d'attente pour le quiz
+    // Si aucune question n'est en attente de réponse, générer une nouvelle question
     sendMessage(senderId, { text: "🏖️ Quiz IA 🏝️ vous prépare une question, veuillez patienter..." }, pageAccessToken);
 
     try {
@@ -44,10 +54,12 @@ module.exports = {
         sendMessage(senderId, { text: quizMessage }, pageAccessToken);
 
         // Stocker la réponse correcte pour vérifier plus tard
+        const correctIndex = allAnswers.indexOf(correctAnswer) + 1; // Index 1-based pour la bonne réponse
         global.QuizContext = global.QuizContext || {};
         global.QuizContext[senderId] = {
           correctAnswer: correctAnswer,
-          allAnswers: allAnswers // stocker les réponses pour plus de clarté
+          correctIndex: correctIndex,
+          waitingForAnswer: true // Indique que nous attendons une réponse
         };
       } else {
         sendMessage(senderId, { text: 'Impossible de récupérer une question de quiz pour le moment.' }, pageAccessToken);
@@ -56,29 +68,5 @@ module.exports = {
       console.error('Erreur lors de la requête API:', error.message, error.response?.data);
       sendMessage(senderId, { text: 'Une erreur est survenue lors de la récupération de la question.' }, pageAccessToken);
     }
-  },
-
-  // Fonction pour vérifier la réponse de l'utilisateur
-  checkAnswer(senderId, userAnswer, pageAccessToken, sendMessage) {
-    const quizContext = global.QuizContext && global.QuizContext[senderId];
-
-    if (!quizContext || !quizContext.correctAnswer) {
-      sendMessage(senderId, { text: 'Il n’y a pas de question active pour le moment. Veuillez demander un quiz.' }, pageAccessToken);
-      return;
-    }
-
-    // Comparer l'index de la réponse utilisateur avec l'index de la réponse correcte
-    const correctAnswer = quizContext.correctAnswer;
-    const selectedAnswer = quizContext.allAnswers[userAnswer - 1];
-    const isCorrect = selectedAnswer === correctAnswer;
-
-    if (isCorrect) {
-      sendMessage(senderId, { text: '✅ Réponse correcte !' }, pageAccessToken);
-    } else {
-      sendMessage(senderId, { text: `❌ Réponse incorrecte. La bonne réponse était : ${correctAnswer}` }, pageAccessToken);
-    }
-
-    // Réinitialiser le contexte de l'utilisateur pour permettre un nouveau quiz
-    delete global.QuizContext[senderId];
   }
 };
