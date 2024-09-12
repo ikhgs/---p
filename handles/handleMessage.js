@@ -40,13 +40,14 @@ async function handleMessage(event, pageAccessToken) {
     return sendMessage(senderId, { text: 'All commands have been started.' }, pageAccessToken);
   }
 
-  // Gérer les commandes spécifiques si une commande est déjà active pour l'utilisateur
+  // Gérer les commandes spécifiques
   if (activeCommands[senderId]) {
     const command = commands.get(activeCommands[senderId]);
     if (command) {
       try {
         await command.execute(senderId, args, pageAccessToken, sendMessage);
-        activeCommands[senderId] = null; // Réinitialiser après exécution
+        // Désactiver la commande par défaut si une commande spécifique est activée
+        activeCommands[senderId] = null;
       } catch (error) {
         console.error(`Error executing command ${activeCommands[senderId]}:`, error);
         sendMessage(senderId, { text: 'There was an error executing your command.' }, pageAccessToken);
@@ -55,20 +56,21 @@ async function handleMessage(event, pageAccessToken) {
     }
   }
 
-  // Vérifier si les commandes sont activées pour l'utilisateur
+  // Vérifier si une commande est activée pour l'utilisateur
   if (commandStates[senderId].active) {
-    // Si une commande correspondante existe, l'exécuter
     if (commands.has(commandName)) {
       const command = commands.get(commandName);
       activeCommands[senderId] = commandName; // Activer la commande spécifique pour cet utilisateur
       try {
         await command.execute(senderId, args, pageAccessToken, sendMessage);
+        // Désactiver la commande par défaut si une commande spécifique est activée
+        activeCommands[senderId] = null;
       } catch (error) {
         console.error(`Error executing command ${commandName}:`, error);
         sendMessage(senderId, { text: 'There was an error executing your command.' }, pageAccessToken);
       }
     } else {
-      // Utiliser la commande par défaut "par" si aucune autre commande ne correspond
+      // Si le message ne correspond à aucune commande connue, utiliser 'par' pour répondre automatiquement
       const defaultCommand = commands.get('par');
       if (defaultCommand) {
         try {
