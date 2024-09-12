@@ -40,12 +40,13 @@ async function handleMessage(event, pageAccessToken) {
     return sendMessage(senderId, { text: 'All commands have been started.' }, pageAccessToken);
   }
 
-  // Gérer les commandes spécifiques
+  // Gérer les commandes spécifiques si une commande est déjà active pour l'utilisateur
   if (activeCommands[senderId]) {
     const command = commands.get(activeCommands[senderId]);
     if (command) {
       try {
         await command.execute(senderId, args, pageAccessToken, sendMessage);
+        activeCommands[senderId] = null; // Réinitialiser après exécution
       } catch (error) {
         console.error(`Error executing command ${activeCommands[senderId]}:`, error);
         sendMessage(senderId, { text: 'There was an error executing your command.' }, pageAccessToken);
@@ -54,8 +55,9 @@ async function handleMessage(event, pageAccessToken) {
     }
   }
 
-  // Vérifier si une commande est activée pour l'utilisateur
+  // Vérifier si les commandes sont activées pour l'utilisateur
   if (commandStates[senderId].active) {
+    // Si une commande correspondante existe, l'exécuter
     if (commands.has(commandName)) {
       const command = commands.get(commandName);
       activeCommands[senderId] = commandName; // Activer la commande spécifique pour cet utilisateur
@@ -66,7 +68,7 @@ async function handleMessage(event, pageAccessToken) {
         sendMessage(senderId, { text: 'There was an error executing your command.' }, pageAccessToken);
       }
     } else {
-      // Si le message ne correspond à aucune commande connue, utiliser 'par' pour répondre automatiquement
+      // Utiliser la commande par défaut "par" si aucune autre commande ne correspond
       const defaultCommand = commands.get('par');
       if (defaultCommand) {
         try {
