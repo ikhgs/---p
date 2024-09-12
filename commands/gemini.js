@@ -1,41 +1,37 @@
 const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
-const downloadImage = require('./downloadImage'); // Fonction pour télécharger une image
+const { downloadImage } = require('../utils/downloadImage'); // Assurez-vous que ce chemin est correct
+const { callGeminiAPI } = require('../utils/callGeminiAPI'); // Assurez-vous que ce chemin est correct
 
 module.exports = {
   name: 'gemini',
-  description: 'Ask a question to the Gemini AI with an optional image',
+  description: 'Ask a question to the Gemini AI with optional image processing',
   author: 'ChatGPT',
 
-  async execute(senderId, args, pageAccessToken, sendMessage, imageUrl) {
+  async execute(senderId, args, pageAccessToken, sendMessage) {
+    const prompt = args.join(' ');
+
     try {
-      let prompt = args.join(' ');
-
-      // Si une image est fournie, télécharger et envoyer l'image
-      if (imageUrl) {
-        const imagePath = await downloadImage(imageUrl);
-        if (!imagePath) {
-          return sendMessage(senderId, { text: 'Failed to download image. Please try again.' }, pageAccessToken);
-        }
-        prompt += ` Image URL: ${imageUrl}`;
-      }
-
       // Envoyer un message d'attente
       sendMessage(senderId, { text: 'Please wait, I am processing your request...' }, pageAccessToken);
 
-      // Appeler l'API Gemini
-      const response = await callGeminiAPI(prompt, imageUrl);
+      // Vérifier si un message contient une image
+      if (args.some(arg => arg.startsWith('http://') || arg.startsWith('https://'))) {
+        const imageUrl = args.find(arg => arg.startsWith('http://') || arg.startsWith('https://'));
+        
+        // Télécharger l'image
+        const imagePath = await downloadImage(imageUrl);
 
-      // Si la réponse dépasse 2000 caractères, divisez-la en plusieurs morceaux
-      const maxMessageLength = 2000;
-      if (response.length > maxMessageLength) {
-        const messages = splitMessageIntoChunks(response, maxMessageLength);
-        for (const message of messages) {
-          sendMessage(senderId, { text: message }, pageAccessToken);
-        }
+        // Appeler l'API Gemini avec l'image
+        const response = await callGeminiAPI({ prompt, imagePath });
+
+        // Gérer la réponse de l'API
+        handleResponse(senderId, response, pageAccessToken, sendMessage);
       } else {
-        sendMessage(senderId, { text: response }, pageAccessToken);
+        // Appeler l'API Gemini avec uniquement le prompt
+        const response = await callGeminiAPI({ prompt });
+
+        // Gérer la réponse de l'API
+        handleResponse(senderId, response, pageAccessToken, sendMessage);
       }
     } catch (error) {
       console.error('Error processing request:', error);
@@ -44,19 +40,17 @@ module.exports = {
   }
 };
 
-// Fonction pour appeler l'API Gemini
-async function callGeminiAPI(prompt, imageUrl) {
-  try {
-    const apiUrl = 'https://gemini-ap-espa-bruno.onrender.com/api/gemini';
-    const payload = {
-      prompt,
-      link: imageUrl,
-      customId: 'some_unique_id' // Identifier the user or session
-    };
-    const response = await axios.post(apiUrl, payload);
-    return response.data.message;
-  } catch (error) {
-    throw new Error(`Gemini API call failed: ${error.message}`);
+// Fonction pour gérer la réponse de l'API
+function handleResponse(senderId, response, pageAccessToken, sendMessage) {
+  const maxMessageLength = 2000;
+
+  if (response.length > maxMessageLength) {
+    const messages = splitMessageIntoChunks(response, maxMessageLength);
+    for (const message of messages) {
+      sendMessage(senderId, { text: message }, pageAccessToken);
+    }
+  } else {
+    sendMessage(senderId, { text: response }, pageAccessToken);
   }
 }
 
