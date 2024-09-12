@@ -8,8 +8,16 @@ module.exports = {
   async execute(senderId, args, pageAccessToken, sendMessage) {
     // Vérifier si l'utilisateur a déjà une question en cours
     if (global.QuizContext && global.QuizContext[senderId] && global.QuizContext[senderId].correctAnswer) {
-      sendMessage(senderId, { text: 'Veuillez répondre à la question précédente avant de recevoir une nouvelle question.' }, pageAccessToken);
-      return;
+      // Si une réponse est attendue, on vérifie si l'utilisateur a répondu
+      const userAnswer = parseInt(args[0], 10); // Convertir la réponse de l'utilisateur en nombre
+
+      if (!isNaN(userAnswer) && userAnswer >= 1 && userAnswer <= 4) {
+        // Vérifier la réponse
+        return this.checkAnswer(senderId, userAnswer, pageAccessToken, sendMessage);
+      } else {
+        sendMessage(senderId, { text: 'Veuillez répondre avec un numéro entre 1 et 4 pour sélectionner une option.' }, pageAccessToken);
+        return;
+      }
     }
 
     // Envoyer un message d'attente pour le quiz
