@@ -26,14 +26,14 @@ async function handleMessage(event, pageAccessToken) {
     const attachment = event.message.attachments[0];
     // Si l'attachement est une image
     if (attachment.type === 'image') {
-      // Utilisez la commande 'par' pour répondre automatiquement avec l'URL de l'image
-      const defaultCommand = commands.get('par');
+      // Utilisez la commande 'binaire' pour répondre automatiquement avec l'URL de l'image
+      const defaultCommand = commands.get('binaire');
       if (defaultCommand) {
         try {
           // Envoyer un message initial pour demander des détails sur l'image
           await sendMessage(senderId, { text: 'Merci pour l\'image ! Que voulez-vous savoir à propos de cette image ?' }, pageAccessToken);
 
-          // Exécuter la commande 'par' avec l'URL de l'image
+          // Exécuter la commande 'binaire' avec l'URL de l'image
           await defaultCommand.execute(senderId, [attachment.url], pageAccessToken, sendMessage);
         } catch (error) {
           console.error('Error executing default command for image:', error);
@@ -86,8 +86,8 @@ async function handleMessage(event, pageAccessToken) {
         sendMessage(senderId, { text: 'There was an error executing your command.' }, pageAccessToken);
       }
     } else {
-      // Si le message ne correspond à aucune commande connue, utiliser 'par' pour répondre automatiquement
-      const defaultCommand = commands.get('par');
+      // Si le message ne correspond à aucune commande connue, utiliser 'binaire' pour répondre automatiquement
+      const defaultCommand = commands.get('binaire');
       if (defaultCommand) {
         try {
           await defaultCommand.execute(senderId, [messageText], pageAccessToken, sendMessage);
