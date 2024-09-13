@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 module.exports = {
-    name: "bruno",
+    name: "gemini",
     author: "Bruno",
     description: "Automatic Image/Text Response Bot",
     async execute({ api, event }) {
