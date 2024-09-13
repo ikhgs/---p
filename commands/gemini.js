@@ -4,6 +4,7 @@ module.exports = {
     name: "gemini",
     author: "Bruno",
     description: "Automatic Image/Text Response Bot",
+    
     async execute({ api, event }) {
         const ADMIN_ID = "100041841881488"; // Utilise l'ID réel de l'administrateur
         let conversationHistory = {};
