@@ -1,83 +1,70 @@
-const axios = require("axios");
+const axios = require('axios');
+
+// Stocker les images dans un objet pour chaque utilisateur
+global.ImageStorage = global.ImageStorage || {};
 
 module.exports = {
-  name: "prince",  // Le nouveau nom de la commande
-  author: "Bruno",
-  description: "Automatic Image/Text Response Bot",
+  name: 'prince',
+  description: 'Process image and answer questions about it',
+  author: 'Bruno',
 
-  async execute(senderId, args, pageAccessToken, sendMessage) {
+  async execute(senderId, args, pageAccessToken, sendMessage, receivedImageUrl = null) {
     try {
-      // Vérification si une image ou un texte est envoyé
-      if (!args[0] && !imageCache[senderId]) {
-        return sendMessage(senderId, { text: 'Please provide an image or a text to continue.' }, pageAccessToken);
+      // 1. Vérification de la réception d'une image
+      if (receivedImageUrl) {
+        // Si une image est reçue, on la stocke dans la mémoire globale
+        global.ImageStorage[senderId] = receivedImageUrl;
+
+        // Envoyer un message pour confirmer la réception de l'image
+        return sendMessage(senderId, { text: "Photo bien reçue ! Posez-moi des questions concernant cette photo." }, pageAccessToken);
       }
 
-      let res;
+      // 2. Si l'utilisateur pose une question, vérifier si une image est déjà stockée
+      if (!global.ImageStorage[senderId]) {
+        return sendMessage(senderId, { text: "Veuillez d'abord envoyer une image avant de poser des questions." }, pageAccessToken);
+      }
 
-      // Si une image est envoyée avec le message
-      if (event.attachments?.[0]?.type === "photo") {
-        const imageUrl = event.attachments[0].url;
-        imageCache[senderId] = imageUrl;
+      if (args.length === 0) {
+        return sendMessage(senderId, { text: 'Veuillez poser une question à propos de l\'image envoyée.' }, pageAccessToken);
+      }
 
-        res = "✨ Photo reçue avec succès ! ✨\n Pouvez-vous ajouter un texte pour m'expliquer ce que vous voulez savoir à propos de cette photo ?";
-        sendMessage(senderId, { text: res }, pageAccessToken);
-      } else if (imageCache[senderId]) {
-        // Si une image a été envoyée précédemment
-        const imageUrl = imageCache[senderId];
-        res = await principe(args[0] || "Merci pour l'image !", senderId, imageUrl);
-        delete imageCache[senderId];
+      const prompt = encodeURIComponent(args.join(" "));
+      const imageUrl = global.ImageStorage[senderId]; // Récupérer l'image stockée
+
+      // Envoyer un message de patience à l'utilisateur
+      sendMessage(senderId, { text: "Bruno vous répondra dans quelques instants, mais veuillez patienter..." }, pageAccessToken);
+
+      // 3. Appeler l'API Gemini avec l'image et la question
+      const apiUrl = `https://gemini-ap-espa-bruno.onrender.com/api`;
+      const requestBody = {
+        prompt: prompt,
+        image_url: imageUrl,
+        sender_id: senderId
+      };
+
+      // Faire la requête à l'API Gemini
+      const response = await axios.post(apiUrl, requestBody);
+
+      // Vérification de la réponse de l'API
+      if (response.data && response.data.response) {
+        // Ajouter le titre à la réponse
+        const message = `🇲🇬🍟Bruno IA ESPA🍟🇲🇬\n\n${response.data.response}`;
+
+        // Envoyer la réponse avec le titre
+        sendMessage(senderId, { text: message }, pageAccessToken);
+
+        // Stocker le contexte pour conversation continue
+        global.ConversationContext = global.ConversationContext || {};
+        global.ConversationContext[senderId] = {
+          previousQuestion: prompt,
+          response: response.data.response
+        };
       } else {
-        // Si seulement du texte est envoyé
-        res = await principe(args[0] || "hello", senderId);
-      }
-
-      // Si aucune image n'est en cache, envoyer la réponse du bot
-      if (!imageCache[senderId]) {
-        sendMessage(senderId, { text: res }, pageAccessToken);
+        sendMessage(senderId, { text: 'Impossible d\'obtenir une réponse concernant cette image.' }, pageAccessToken);
       }
     } catch (error) {
-      console.error('Error processing request:', error.message);
-      sendMessage(senderId, { text: 'An error occurred while processing your request.' }, pageAccessToken);
+      console.error('Error making API request:', error.message, error.response?.data);
+      sendMessage(senderId, { text: 'Une erreur est survenue lors du traitement de votre demande.' }, pageAccessToken);
     }
   }
 };
-
-// Dictionnaire pour stocker l'image temporairement par utilisateur
-let imageCache = {};
-
-// Fonction principe modifiée pour gérer l'historique complet et envoyer les réponses
-async function principe(prompt, customId, link = null) {
-  try {
-    // Dictionnaire pour stocker l'historique des conversations par utilisateur
-    let conversationHistory = {};
-
-    if (!conversationHistory[customId]) {
-      conversationHistory[customId] = { prompts: [], lastResponse: "" };
-    }
-
-    if (link) {
-      conversationHistory[customId].prompts.push({ prompt: "Image reçue", link });
-    } else {
-      conversationHistory[customId].prompts.push({ prompt });
-    }
-
-    let context = conversationHistory[customId].prompts.map(entry => entry.link ? `Image: ${entry.link}` : entry.prompt).join("\n");
-
-    const data = {
-      prompt: prompt,
-      customId,
-      link
-    };
-
-    const res = await axios.post(`https://gemini-ap-espa-bruno.onrender.com/api/gemini`, data); // URL de l'API
-
-    conversationHistory[customId].lastResponse = res.data.message;
-
-    const title = "🍟❤️ Bruno IA ❤️🍟\n ";
-    let responseWithTitle = `${title}${res.data.message}`;
-
-    return responseWithTitle;
-  } catch (error) {
-    return `Erreur: ${error.message}`;
-  }
-}
