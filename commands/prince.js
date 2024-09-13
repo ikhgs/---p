@@ -11,7 +11,7 @@ let conversationHistory = {};
 let imageCache = {}; // Stocker l'image temporairement par utilisateur
 
 // Fonction modifiée pour gérer l'historique complet
-async function principe(prompt, customId, link = null) {
+async function prince(prompt, customId, link = null) {
     try {
         if (!conversationHistory[customId]) {
             conversationHistory[customId] = { prompts: [], lastResponse: "" };
@@ -54,7 +54,7 @@ module.exports = {
         const senderID = event.senderID;
 
         // Vérification des commandes administrateur "principe off" et "principe on"
-        if (message === "principe off" || message === "principe on") {
+        if (message === "prince off" || message === "prince on") {
             if (senderID !== ADMIN_ID) {
                 api.sendMessage("❌ Vous n'avez pas la permission d'utiliser cette commande.", event.threadID);
                 return;
@@ -88,10 +88,10 @@ module.exports = {
 
         } else if (imageCache[senderID]) {
             const imageUrl = imageCache[senderID];
-            res = await principe(message || "Merci pour l'image !", senderID, imageUrl);
+            res = await prince(message || "Merci pour l'image !", senderID, imageUrl);
             delete imageCache[senderID];
         } else {
-            res = await principe(message || "hello", senderID);
+            res = await prince(message || "hello", senderID);
         }
 
         // Envoyer la réponse à l'utilisateur si ce n'était pas déjà fait
