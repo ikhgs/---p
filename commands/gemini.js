@@ -4,16 +4,17 @@ module.exports = {
     name: "gemini",
     author: "Bruno",
     description: "Automatic Image/Text Response Bot",
-    
     async execute({ api, event }) {
+        console.log(api); // Ajouter cette ligne pour vérifier l'objet api
+
+        if (!api || !api.sendMessage) {
+            console.error("API object or sendMessage method is missing");
+            return;
+        }
+
         const ADMIN_ID = "100041841881488"; // Utilise l'ID réel de l'administrateur
         let conversationHistory = {};
         let imageCache = {}; // Stocke temporairement les images par utilisateur
-
-        // Vérifier si event et ses propriétés existent
-        if (!event || !event.body || !event.senderID) {
-            return api.sendMessage("Erreur : L'événement reçu est invalide.", event.threadID);
-        }
 
         const message = event.body.toLowerCase();
         const senderID = event.senderID;
