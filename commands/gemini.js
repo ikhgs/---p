@@ -10,6 +10,11 @@ module.exports = {
         let conversationHistory = {};
         let imageCache = {}; // Stocke temporairement les images par utilisateur
 
+        // Vérifier si event et ses propriétés existent
+        if (!event || !event.body || !event.senderID) {
+            return api.sendMessage("Erreur : L'événement reçu est invalide.", event.threadID);
+        }
+
         const message = event.body.toLowerCase();
         const senderID = event.senderID;
 
