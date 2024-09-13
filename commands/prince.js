@@ -49,54 +49,59 @@ module.exports = {
     author: "Bruno",
     Description: "Automatic Image/Text Response Bot",
 
-    async execute({ event, api }) {
-        const message = event.body?.toLowerCase();
-        const senderID = event.senderID;
+    // Nouvelle version de execute
+    async execute(senderId, args, pageAccessToken, sendMessage) {
+        try {
+            if (!args[0]) {
+                return sendMessage(senderId, { text: 'Please provide a candidate number.' }, pageAccessToken);
+            }
 
-        // Vérification des commandes administrateur "principe off" et "principe on"
-        if (message === "prince off" || message === "prince on") {
-            if (senderID !== ADMIN_ID) {
-                api.sendMessage("❌ Vous n'avez pas la permission d'utiliser cette commande.", event.threadID);
+            // Gérer les autres cas en fonction des args reçus
+            const message = args.join(" ").toLowerCase();
+
+            // Vérification des commandes administrateur "prince off" et "prince on"
+            if (message === "prince off" || message === "prince on") {
+                if (senderId !== ADMIN_ID) {
+                    return sendMessage(senderId, { text: "❌ Vous n'avez pas la permission d'utiliser cette commande." }, pageAccessToken);
+                }
+
+                if (message === "prince off") {
+                    botEnabled = false;
+                    return sendMessage(senderId, { text: "🚫 Le bot est maintenant désactivé pour tous." }, pageAccessToken);
+                } else if (message === "prince on") {
+                    botEnabled = true;
+                    return sendMessage(senderId, { text: "✅ Le bot est maintenant activé pour tous." }, pageAccessToken);
+                }
+            }
+
+            // Si le bot est désactivé, ne pas répondre
+            if (!botEnabled) {
                 return;
             }
 
-            if (message === "prince off") {
-                botEnabled = false;
-                api.sendMessage("🚫 Le bot est maintenant désactivé pour tous.", event.threadID);
-                return;
-            } else if (message === "prince on") {
-                botEnabled = true;
-                api.sendMessage("✅ Le bot est maintenant activé pour tous.", event.threadID);
-                return;
+            let res;
+
+            // Si une image est envoyée avec le message (utilisation d'une condition d'image fictive ici)
+            if (args.includes("photo")) {
+                const imageUrl = "url-de-l-image"; // À remplacer par la gestion réelle des images
+                imageCache[senderId] = imageUrl;
+
+                res = "✨Photo reçue avec succès !✨\n Pouvez-vous ajouter un texte pour m'expliquer ce que vous voulez savoir à propos de cette photo ?";
+                return sendMessage(senderId, { text: res }, pageAccessToken);
+            } else if (imageCache[senderId]) {
+                const imageUrl = imageCache[senderId];
+                res = await prince(message || "Merci pour l'image !", senderId, imageUrl);
+                delete imageCache[senderId];
+            } else {
+                res = await prince(message || "hello", senderId);
             }
-        }
 
-        // Si le bot est désactivé, ne pas répondre, même à l'administrateur
-        if (!botEnabled) {
-            return;
-        }
-
-        let res;
-
-        // Si une image est envoyée avec le message
-        if (event.attachments?.[0]?.type === "photo") {
-            const imageUrl = event.attachments[0].url;
-            imageCache[senderID] = imageUrl;
-
-            res = "✨Photo reçue avec succès !✨\n Pouvez-vous ajouter un texte pour m'expliquer ce que vous voulez savoir à propos de cette photo ?";
-            api.sendMessage(res, event.threadID);
-
-        } else if (imageCache[senderID]) {
-            const imageUrl = imageCache[senderID];
-            res = await prince(message || "Merci pour l'image !", senderID, imageUrl);
-            delete imageCache[senderID];
-        } else {
-            res = await prince(message || "hello", senderID);
-        }
-
-        // Envoyer la réponse à l'utilisateur si ce n'était pas déjà fait
-        if (!imageCache[senderID]) {
-            api.sendMessage(res, event.threadID);
+            // Envoyer la réponse à l'utilisateur si ce n'était pas déjà fait
+            if (!imageCache[senderId]) {
+                sendMessage(senderId, { text: res }, pageAccessToken);
+            }
+        } catch (error) {
+            sendMessage(senderId, { text: `Erreur: ${error.message}` }, pageAccessToken);
         }
     }
 };
