@@ -1,84 +1,114 @@
 const axios = require('axios');
+const FormData = require('form-data');
+const fs = require('fs');
+const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 
 module.exports = {
-    name: "gemini",
-    author: "Bruno",
-    description: "Automatic Image/Text Response Bot",
-    async execute({ api, event }) {
-        console.log(api); // Ajouter cette ligne pour vérifier l'objet api
+  name: 'gemini',
+  description: 'Respond to the photo sent by the user and continue the discussion based on it',
+  author: 'Bruno',
+  async execute(senderId, args, pageAccessToken, sendMessage) {
+    try {
+      // Check if the message contains an image
+      if (!args[0] || !args[0].imageUrl) {
+        return sendMessage(senderId, { text: 'Please send a photo for analysis.' }, pageAccessToken);
+      }
 
-        if (!api || !api.sendMessage) {
-            console.error("API object or sendMessage method is missing");
-            return;
-        }
+      const imageUrl = args[0].imageUrl;
 
-        const ADMIN_ID = "100041841881488"; // Utilise l'ID réel de l'administrateur
-        let conversationHistory = {};
-        let imageCache = {}; // Stocke temporairement les images par utilisateur
+      // Download the image
+      const imagePath = await downloadImage(imageUrl);
+      if (!imagePath) {
+        return sendMessage(senderId, { text: 'Failed to download image.' }, pageAccessToken);
+      }
 
-        const message = event.body.toLowerCase();
-        const senderID = event.senderID;
+      // Upload the image to Gemini for analysis
+      const file = await uploadToGemini(imagePath);
+      if (!file) {
+        return sendMessage(senderId, { text: 'Failed to upload image to Gemini.' }, pageAccessToken);
+      }
 
-        // Commandes administrateur pour activer/désactiver le bot
-        if (message === "principe off" && senderID === ADMIN_ID) {
-            api.botEnabled = false;
-            return api.sendMessage("🚫 Le bot est maintenant désactivé.", event.threadID);
-        } else if (message === "principe on" && senderID === ADMIN_ID) {
-            api.botEnabled = true;
-            return api.sendMessage("✅ Le bot est maintenant activé.", event.threadID);
-        }
+      // Create a prompt based on the image analysis
+      const requestPayload = {
+        prompt: `Analyze the content of this image.`,
+        customId: senderId,
+        link: imageUrl
+      };
 
-        // Si le bot est désactivé, ignore les messages
-        if (!api.botEnabled && senderID !== ADMIN_ID) return;
+      // Send the request to your Gemini API
+      const apiUrl = `https://gemini-ap-espa-bruno.onrender.com/api/gemini`;
+      const response = await axios.post(apiUrl, requestPayload);
 
-        // Gérer les messages avec des images attachées
-        if (event.attachments?.[0]?.type === "photo") {
-            const imageUrl = event.attachments[0].url;
-            imageCache[senderID] = imageUrl;
-            return api.sendMessage("✨ Photo reçue avec succès ! Pouvez-vous ajouter un texte pour expliquer ce que vous voulez savoir à propos de cette photo ?", event.threadID);
-        }
+      if (response.data && response.data.message) {
+        // Send the analysis result to the user
+        const resultMessage = response.data.message;
 
-        let responseMessage;
-
-        if (imageCache[senderID]) {
-            const imageUrl = imageCache[senderID];
-            responseMessage = await handleRequest(message, senderID, imageUrl, conversationHistory);
-            delete imageCache[senderID]; // Nettoyer après la réponse
+        // Split the response into chunks if it exceeds 2000 characters
+        const maxMessageLength = 2000;
+        if (resultMessage.length > maxMessageLength) {
+          const messages = splitMessageIntoChunks(resultMessage, maxMessageLength);
+          for (const message of messages) {
+            sendMessage(senderId, { text: message }, pageAccessToken);
+          }
         } else {
-            responseMessage = await handleRequest(message, senderID, null, conversationHistory);
+          sendMessage(senderId, { text: resultMessage }, pageAccessToken);
         }
 
-        api.sendMessage(responseMessage, event.threadID);
+        // Save the image path and the response for continued discussion
+        // Here you might want to save this information in a session or a database
+        // For simplicity, this is just an example
+        sessions[senderId] = {
+          lastImage: imagePath,
+          lastResponse: resultMessage
+        };
+
+      } else {
+        sendMessage(senderId, { text: 'Could not analyze the image.' }, pageAccessToken);
+      }
+    } catch (error) {
+      console.error('Error processing image:', error.message);
+      sendMessage(senderId, { text: 'An error occurred while processing your image.' }, pageAccessToken);
     }
+  }
 };
 
-async function handleRequest(prompt, customId, link, conversationHistory) {
-    if (!conversationHistory[customId]) {
-        conversationHistory[customId] = { prompts: [], lastResponse: "" };
-    }
+// Function to download an image from a URL
+async function downloadImage(url) {
+  const response = await axios.get(url, { responseType: 'stream' });
+  if (response.status === 200) {
+    const tempFilePath = path.join(__dirname, `${uuidv4()}.jpg`);
+    response.data.pipe(fs.createWriteStream(tempFilePath));
+    return new Promise((resolve, reject) => {
+      response.data.on('end', () => resolve(tempFilePath));
+      response.data.on('error', (err) => reject(err));
+    });
+  } else {
+    return null;
+  }
+}
 
-    if (link) {
-        conversationHistory[customId].prompts.push({ prompt: "Image reçue", link });
-    } else {
-        conversationHistory[customId].prompts.push({ prompt });
-    }
+// Function to upload the image to Gemini
+async function uploadToGemini(filePath) {
+  const form = new FormData();
+  form.append('file', fs.createReadStream(filePath));
 
-    let context = conversationHistory[customId].prompts.map(entry => entry.link ? `Image: ${entry.link}` : entry.prompt).join("\n");
+  try {
+    const response = await axios.post('https://gemini-ap-espa-bruno.onrender.com/api/upload', form, {
+      headers: form.getHeaders()
+    });
+    return response.data.file; // Adjust this according to the actual response format from Gemini
+  } catch (error) {
+    console.error('Error uploading image to Gemini:', error.message);
+    return null;
+  }
+}
 
-    const data = {
-        prompt: prompt,
-        customId,
-        link
-    };
-
-    try {
-        const res = await axios.post(`https://gemini-ap-espa-bruno.onrender.com/api/gemini`, data);
-        conversationHistory[customId].lastResponse = res.data.message;
-
-        const title = "🍟❤️𝔹𝕣𝕦𝕟𝕠 𝕀𝔸 𝔼𝕊ℙ𝔸❤️🍟\n";
-        let responseWithTitle = `${title}${res.data.message}`;
-        return responseWithTitle;
-    } catch (error) {
-        return `Erreur: ${error.message}`;
-    }
+// Function to split a message into chunks
+function splitMessageIntoChunks(message, chunkSize) {
+  const chunks = [];
+  for (let i = 0; i < message.length; i += chunkSize) {
+    chunks.push(message.slice(i, i + chunkSize));
+  }
+  return chunks;
 }
