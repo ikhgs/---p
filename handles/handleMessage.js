@@ -46,8 +46,6 @@ async function handleMessage(event, pageAccessToken) {
     if (command) {
       try {
         await command.execute(senderId, args, pageAccessToken, sendMessage);
-        // Désactiver la commande par défaut si une commande spécifique est activée
-        activeCommands[senderId] = null;
       } catch (error) {
         console.error(`Error executing command ${activeCommands[senderId]}:`, error);
         sendMessage(senderId, { text: 'There was an error executing your command.' }, pageAccessToken);
@@ -63,15 +61,13 @@ async function handleMessage(event, pageAccessToken) {
       activeCommands[senderId] = commandName; // Activer la commande spécifique pour cet utilisateur
       try {
         await command.execute(senderId, args, pageAccessToken, sendMessage);
-        // Désactiver la commande par défaut si une commande spécifique est activée
-        activeCommands[senderId] = null;
       } catch (error) {
         console.error(`Error executing command ${commandName}:`, error);
         sendMessage(senderId, { text: 'There was an error executing your command.' }, pageAccessToken);
       }
     } else {
       // Si le message ne correspond à aucune commande connue, utiliser 'par' pour répondre automatiquement
-      const defaultCommand = commands.get('par');
+      const defaultCommand = commands.get('gemini');
       if (defaultCommand) {
         try {
           await defaultCommand.execute(senderId, [messageText], pageAccessToken, sendMessage);
