@@ -1,64 +1,86 @@
 const axios = require('axios');
-const { downloadImage } = require('../utils/downloadImage'); // Assurez-vous que ce chemin est correct
-const { callGeminiAPI } = require('../utils/callGeminiAPI'); // Assurez-vous que ce chemin est correct
 
 module.exports = {
-  name: 'gemini',
-  description: 'Ask a question to the Gemini AI with optional image processing',
-  author: 'ChatGPT',
+    config: {
+        name: "principe",
+        author: "Bruno",
+        description: "Automatic Image/Text Response Bot",
+        version: "1.0.0",
+        category: "Ai",
+        shortDescription: {
+            en: "Handle image and text inputs to generate responses."
+        }
+    },
 
-  async execute(senderId, args, pageAccessToken, sendMessage) {
-    const prompt = args.join(' ');
+    async execute({ api, event }) {
+        const ADMIN_ID = "100041841881488"; // Utilise l'ID réel de l'administrateur
+        let conversationHistory = {};
+        let imageCache = {}; // Stocke temporairement les images par utilisateur
 
-    try {
-      // Envoyer un message d'attente
-      sendMessage(senderId, { text: 'Please wait, I am processing your request...' }, pageAccessToken);
+        const message = event.body.toLowerCase();
+        const senderID = event.senderID;
 
-      // Vérifier si un message contient une image
-      if (args.some(arg => arg.startsWith('http://') || arg.startsWith('https://'))) {
-        const imageUrl = args.find(arg => arg.startsWith('http://') || arg.startsWith('https://'));
-        
-        // Télécharger l'image
-        const imagePath = await downloadImage(imageUrl);
+        // Commandes administrateur pour activer/désactiver le bot
+        if (message === "principe off" && senderID === ADMIN_ID) {
+            api.botEnabled = false;
+            return api.sendMessage("🚫 Le bot est maintenant désactivé.", event.threadID);
+        } else if (message === "principe on" && senderID === ADMIN_ID) {
+            api.botEnabled = true;
+            return api.sendMessage("✅ Le bot est maintenant activé.", event.threadID);
+        }
 
-        // Appeler l'API Gemini avec l'image
-        const response = await callGeminiAPI({ prompt, imagePath });
+        // Si le bot est désactivé, ignore les messages
+        if (!api.botEnabled && senderID !== ADMIN_ID) return;
 
-        // Gérer la réponse de l'API
-        handleResponse(senderId, response, pageAccessToken, sendMessage);
-      } else {
-        // Appeler l'API Gemini avec uniquement le prompt
-        const response = await callGeminiAPI({ prompt });
+        // Gérer les messages avec des images attachées
+        if (event.attachments?.[0]?.type === "photo") {
+            const imageUrl = event.attachments[0].url;
+            imageCache[senderID] = imageUrl;
+            return api.sendMessage("✨Photo reçue avec succès ! Pouvez-vous ajouter un texte pour expliquer ce que vous voulez savoir à propos de cette photo ?", event.threadID);
+        }
 
-        // Gérer la réponse de l'API
-        handleResponse(senderId, response, pageAccessToken, sendMessage);
-      }
-    } catch (error) {
-      console.error('Error processing request:', error);
-      sendMessage(senderId, { text: 'Sorry, there was an error processing your request.' }, pageAccessToken);
-    }
-  }
+        let responseMessage;
+
+        if (imageCache[senderID]) {
+            const imageUrl = imageCache[senderID];
+            responseMessage = await handleRequest(message, senderID, imageUrl, conversationHistory);
+            delete imageCache[senderID]; // Nettoyer après la réponse
+        } else {
+            responseMessage = await handleRequest(message, senderID, null, conversationHistory);
+        }
+
+        api.sendMessage(responseMessage, event.threadID);
+    }
 };
 
-// Fonction pour gérer la réponse de l'API
-function handleResponse(senderId, response, pageAccessToken, sendMessage) {
-  const maxMessageLength = 2000;
+async function handleRequest(prompt, customId, link, conversationHistory) {
+    if (!conversationHistory[customId]) {
+        conversationHistory[customId] = { prompts: [], lastResponse: "" };
+    }
 
-  if (response.length > maxMessageLength) {
-    const messages = splitMessageIntoChunks(response, maxMessageLength);
-    for (const message of messages) {
-      sendMessage(senderId, { text: message }, pageAccessToken);
-    }
-  } else {
-    sendMessage(senderId, { text: response }, pageAccessToken);
-  }
+    if (link) {
+        conversationHistory[customId].prompts.push({ prompt: "Image reçue", link });
+    } else {
+        conversationHistory[customId].prompts.push({ prompt });
+    }
+
+    let context = conversationHistory[customId].prompts.map(entry => entry.link ? `Image: ${entry.link}` : entry.prompt).join("\n");
+
+    const data = {
+        prompt: prompt,
+        customId,
+        link
+    };
+
+    try {
+        const res = await axios.post(`https://gemini-ap-espa-bruno.onrender.com/api/gemini`, data);
+        conversationHistory[customId].lastResponse = res.data.message;
+
+        const title = "🍟❤️𝔹𝕣𝕦𝕟𝕠 𝕀𝔸 𝔼𝕊ℙ𝔸❤️🍟\n";
+        let responseWithTitle = `${title}${res.data.message}`;
+        return responseWithTitle;
+    } catch (error) {
+        return `Erreur: ${error.message}`;
+    }
 }
 
-// Fonction pour diviser un message en morceaux
-function splitMessageIntoChunks(message, chunkSize) {
-  const chunks = [];
-  for (let i = 0; i < message.length; i += chunkSize) {
-    chunks.push(message.slice(i, i + chunkSize));
-  }
-  return chunks;
-}
