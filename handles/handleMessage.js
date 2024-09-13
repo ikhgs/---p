@@ -3,7 +3,11 @@ const path = require('path');
 const { sendMessage } = require('./sendMessage');
 const axios = require('axios');
 const FormData = require('form-data');
-const tempfile = require('tempfile');
+let tempfile;
+(async () => {
+  tempfile = (await import('tempfile')).default;
+})();
+
 
 // Stocker les états d'activation des commandes pour chaque utilisateur
 const commandStates = {};
