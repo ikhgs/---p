@@ -26,7 +26,7 @@ async function binaire(prompt, customId, link = null) {
         };
 
         // Faire la requête POST à l'API Flask
-        const res = await axios.post(`https://app-j3tw.vercel.app/api/gemini`, data); // Remplace avec l'URL correcte de ton API
+        const res = await axios.post(`https://gemini-ap-espa-bruno.onrender.com/api/gemini`, data); // Remplace avec l'URL correcte de ton API
 
         // Ajouter le titre à la réponse
         const title = "❤️🍟Bruno IA ESPA🍟❤️ \n ";
