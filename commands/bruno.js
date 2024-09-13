@@ -2,7 +2,7 @@ const axios = require('axios');
 
 module.exports = {
     config: {
-        name: "principe",
+        name: "bruno",
         author: "Bruno",
         description: "Automatic Image/Text Response Bot",
         version: "1.0.0",
