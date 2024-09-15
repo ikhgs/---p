@@ -15,10 +15,11 @@ module.exports = {
 
       const response = await axios.post(apiUrl, { text: userMessage });
 
+      console.log('API Response:', response.data);  // Log the entire response
+
       if (response.data && response.data.reply) {
         const botReply = response.data.reply;
 
-        // Split the response into chunks if it exceeds 2000 characters
         const maxMessageLength = 2000;
         if (botReply.length > maxMessageLength) {
           const messages = splitMessageIntoChunks(botReply, maxMessageLength);
