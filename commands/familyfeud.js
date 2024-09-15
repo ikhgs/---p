@@ -2,46 +2,48 @@ const axios = require('axios');
 let status = true;
 
 module.exports = {
-    name: "familyfeud",
-    author: "LiANE @nealianacagara",
-    description: "Family Feud prompt",
+  name: "familyfeud",
+  author: "LiANE @nealianacagara",
+  description: "Family Feud prompt",
 
-  async execute(senderId, args, pageAccessToken, sendMessage) {
-    if (!status) return;
-    try {
-      // Préfixe par défaut si non fourni par une configuration globale
-      const prefix = '?'; // Utiliser un préfixe statique ou par défaut
+  async execute(senderId, args, pageAccessToken, sendMessage) {
+    if (!status) return;
 
-      // Préparer l'événement
-      const event = {
-        prefixes: [prefix],
-        strictPrefix: true,
-        body: `${prefix}${args.join(' ')}` // Construire le message avec les arguments
-      };
+    try {
+      // Préfixe par défaut
+      const prefix = '?'; 
 
-      // Envoyer une requête GET à l'API
-      const response = await axios.get("https://cassidybot.onrender.com/postWReply", {
-        params: { body: event.body }
-      });
+      // Préparer l'événement
+      const event = {
+        prefixes: [prefix],
+        strictPrefix: true,
+        body: `${prefix}${args.join(' ')}`
+      };
 
-      // Extraire les données de la réponse
-      const { result: { body, messageID }, status: estatus, result } = response.data;
+      // Envoyer une requête GET à l'API
+      const response = await axios.get("https://cassidybot.onrender.com/postWReply", {
+        params: { body: event.body }
+      });
 
-      if (estatus === "fail") {
-        return;
-      }
+      // Extraire les données de la réponse
+      const { result: { body, messageID }, status: estatus, result } = response.data;
 
-      // Répondre au message et stocker l'ID du message de réponse
-      sendMessage(body, (_, info) => {
-        global.GoatBot.onReply.set(info.messageID, {
-          commandName: 'familyfeud',
-          author: senderId,
-          result
-        });
-      });
+      if (estatus === "fail") {
+        console.error("L'API a échoué.");
+        return;
+      }
 
-    } catch (error) {
-      console.error("Erreur dans la commande familyfeud:", error);
-    }
-  }
+      // Répondre au message
+      sendMessage(body, (_, info) => {
+        global.GoatBot.onReply.set(info.messageID, {
+          commandName: 'familyfeud',
+          author: senderId,
+          result
+        });
+      });
+
+    } catch (error) {
+      console.error("Erreur dans la commande familyfeud:", error.response ? error.response.data : error.message);
+    }
+  }
 };
