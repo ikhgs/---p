@@ -1,37 +1,41 @@
 const axios = require('axios');
 
 module.exports = {
-  name: 'reply',
-  description: 'Send a message to Cassidy Bot and get a reply',
+  name: 'historique',
+  description: 'Fetch Wikipedia excerpt by page title',
   author: 'Bruno',
   async execute(senderId, args, pageAccessToken, sendMessage) {
     try {
       if (!args[0]) {
-        return sendMessage(senderId, { text: 'Please provide a message to send.' }, pageAccessToken);
+        return sendMessage(senderId, { text: 'Please provide a Wikipedia page title.' }, pageAccessToken);
       }
 
-      const userMessage = args.join(' ');
-      const apiUrl = 'https://cassidybot.onrender.com/postWReply';
+      const pageTitle = args[0];
+      const apiUrl = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(pageTitle)}&prop=extracts&format=json&exintro`;
 
-      const response = await axios.post(apiUrl, { text: userMessage });
+      const response = await axios.get(apiUrl);
 
-      console.log('API Response:', response.data);  // Log the entire response
+      const pages = response.data.query.pages;
+      const page = Object.values(pages)[0];  // Get the first page from the response
 
-      if (response.data && response.data.reply) {
-        const botReply = response.data.reply;
+      if (page.extract) {
+        const resultMessage = page.extract;
 
+        // Split the response into chunks if it exceeds 2000 characters
         const maxMessageLength = 2000;
-        if (botReply.length > maxMessageLength) {
-          const messages = splitMessageIntoChunks(botReply, maxMessageLength);
-          messages.forEach(message => sendMessage(senderId, { text: message }, pageAccessToken));
+        if (resultMessage.length > maxMessageLength) {
+          const messages = splitMessageIntoChunks(resultMessage, maxMessageLength);
+          for (const message of messages) {
+            sendMessage(senderId, { text: message }, pageAccessToken);
+          }
         } else {
-          sendMessage(senderId, { text: botReply }, pageAccessToken);
+          sendMessage(senderId, { text: resultMessage }, pageAccessToken);
         }
       } else {
-        sendMessage(senderId, { text: 'No reply received from Cassidy Bot.' }, pageAccessToken);
+        sendMessage(senderId, { text: `No excerpt found for the page titled "${pageTitle}".` }, pageAccessToken);
       }
     } catch (error) {
-      console.error('Error sending message to Cassidy Bot:', error.message);
+      console.error('Error fetching Wikipedia excerpt:', error.message);
       sendMessage(senderId, { text: 'An error occurred while processing your request.' }, pageAccessToken);
     }
   }
