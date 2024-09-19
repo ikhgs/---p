@@ -1,67 +1,79 @@
 const axios = require('axios');
-const fs = require('fs');
-const FormData = require('form-data');
+
+// Stockage des sessions de chaque utilisateur
+const sessions = {};
+
+// Fonction pour appeler l'API Gemini
+async function callGeminiAPI(customId, prompt, imageUrl = null) {
+  try {
+    const response = await axios.post('https://gemini-ap-espa-bruno.onrender.com/api/gemini', {
+      prompt: prompt,
+      customId: customId,
+      link: imageUrl
+    });
+    return response.data.message;
+  } catch (error) {
+    console.error('Error calling Gemini API:', error);
+    return 'Sorry, an error occurred while processing your request.';
+  }
+}
 
 module.exports = {
   name: 'gemini',
-  description: 'Process images and get responses from Gemini',
-  author: 'Bruno',
-  async execute(senderId, args, pageAccessToken, sendMessage) {
-    try {
-      if (!args[0]) {
-        return sendMessage(senderId, { text: 'Please send a photo for analysis.' }, pageAccessToken);
+  description: 'Handle conversation with image processing using Gemini API',
+
+  async execute(event, PAGE_ACCESS_TOKEN) {
+    const senderId = event.sender.id;
+
+    // Vérifier si c'est un message contenant une pièce jointe (image)
+    if (event.message.attachments && event.message.attachments[0].type === 'image') {
+      const imageUrl = event.message.attachments[0].payload.url;
+
+      // Stocker l'image pour l'utilisateur
+      if (!sessions[senderId]) {
+        sessions[senderId] = { imageUrl: null, history: [] };
       }
+      sessions[senderId].imageUrl = imageUrl;
 
-      const imagePath = args[0];
+      // Envoyer l'image à l'API Gemini et informer l'utilisateur
+      const responseMessage = await callGeminiAPI(senderId, 'Analyse cette image', imageUrl);
+      sessions[senderId].history.push({ role: 'user', message: 'Analyse cette image' });
+      sessions[senderId].history.push({ role: 'bot', message: responseMessage });
 
-      const fileUrl = await uploadToGemini(imagePath);
-      if (!fileUrl) {
-        return sendMessage(senderId, { text: 'Failed to upload image to Gemini.' }, pageAccessToken);
-      }
+      // Répondre à l'utilisateur
+      sendMessage(senderId, responseMessage, PAGE_ACCESS_TOKEN);
+    } else if (event.message.text) {
+      // L'utilisateur pose une question après avoir envoyé une image
+      const userMessage = event.message.text;
 
-      const responseMessage = await getGeminiResponse(fileUrl);
-      if (responseMessage) {
-        sendMessage(senderId, { text: responseMessage }, pageAccessToken);
+      // Si une image a été envoyée précédemment
+      if (sessions[senderId] && sessions[senderId].imageUrl) {
+        const responseMessage = await callGeminiAPI(senderId, userMessage, sessions[senderId].imageUrl);
+        sessions[senderId].history.push({ role: 'user', message: userMessage });
+        sessions[senderId].history.push({ role: 'bot', message: responseMessage });
+
+        // Répondre à l'utilisateur
+        sendMessage(senderId, responseMessage, PAGE_ACCESS_TOKEN);
       } else {
-        sendMessage(senderId, { text: 'Failed to get a response from Gemini.' }, pageAccessToken);
+        // Si aucune image n'a été envoyée, informer l'utilisateur
+        sendMessage(senderId, 'Veuillez d\'abord envoyer une image.', PAGE_ACCESS_TOKEN);
       }
-    } catch (error) {
-      console.error('Error executing Gemini command:', error.message);
-      sendMessage(senderId, { text: 'An error occurred while processing your request.' }, pageAccessToken);
     }
   }
 };
 
-async function uploadToGemini(filePath) {
-  try {
-    const formData = new FormData();
-    formData.append('file', fs.createReadStream(filePath));
+// Fonction pour envoyer un message via l'API Facebook Messenger
+function sendMessage(senderId, message, PAGE_ACCESS_TOKEN) {
+  const requestBody = {
+    recipient: { id: senderId },
+    message: { text: message }
+  };
 
-    const response = await axios.post('https://gemini-ap-espa-bruno.onrender.com/api/upload', formData, {
-      headers: formData.getHeaders()
+  axios.post(`https://graph.facebook.com/v11.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, requestBody)
+    .then(() => {
+      console.log('Message sent to user');
+    })
+    .catch(error => {
+      console.error('Error sending message:', error);
     });
-
-    if (response.data && response.data.fileUrl) {
-      return response.data.fileUrl;
-    }
-    return null;
-  } catch (error) {
-    console.error('Error uploading image to Gemini:', error.message);
-    return null;
-  }
-}
-
-async function getGeminiResponse(fileUrl) {
-  try {
-    const response = await axios.post('https://gemini-ap-espa-bruno.onrender.com/api/gemini', {
-      prompt: 'Describe the content of this image',
-      customId: 'unique-session-id', // Générer un ID unique pour chaque session
-      link: fileUrl
-    });
-
-    return response.data.message;
-  } catch (error) {
-    console.error('Error fetching response from Gemini:', error.message);
-    return null;
-  }
 }
